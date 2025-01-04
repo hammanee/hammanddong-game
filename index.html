@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>햄만똥 피하기 게임</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background-color: #f0f8ff;
+        }
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+        #startButton {
+            padding: 15px 30px;
+            font-size: 20px;
+            font-family: Arial, sans-serif;
+            background-color: black;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        #retryScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            z-index: 10;
+        }
+        #retryButton {
+            padding: 15px 30px;
+            font-size: 20px;
+            background-color: black;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Start Screen -->
+    <div id="startScreen">
+        <button id="startButton">시작</button>
+    </div>
+
+    <!-- Retry Screen -->
+    <div id="retryScreen">
+        <button id="retryButton">다시하기</button>
+    </div>
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size to fit the device screen
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        canvas.width = screenWidth;
+        canvas.height = screenHeight;
+
+        // Scale factors for character and poop size
+        const scaleFactor = screenHeight / 800; // Adjust sizes relative to screen height
+
+        // Colors
+        const WHITE = "#FFFFFF";
+        const BLACK = "#000000";
+
+        // Game variables
+        const player = {
+            x: canvas.width / 2 - 25 * scaleFactor,
+            y: canvas.height - 120 * scaleFactor,
+            width: 50 * scaleFactor,
+            height: 100 * scaleFactor,
+            speed: 7 * scaleFactor,
+            dx: 0,
+        };
+
+        const poops = []; // Array to store multiple poops
+        const poopCount = 5; // Number of poops
+        let score = 0;
+        let running = false;
+
+        // Images
+        const playerImage = new Image();
+        playerImage.src = "워니화남.png"; // Replace with the actual path
+
+        const poopImage = new Image();
+        poopImage.src = "햄만똥.png"; // Replace with the actual path
+
+        poopImage.onload = function() {
+            // Initialize poops with random positions and speeds
+            for (let i = 0; i < poopCount; i++) {
+                const aspectRatio = poopImage.width / poopImage.height;
+                const desiredHeight = 50 * scaleFactor;
+                const poopWidth = desiredHeight * aspectRatio;
+                poops.push({
+                    x: Math.random() * (canvas.width - poopWidth),
+                    y: Math.random() * -canvas.height, // Start above the screen
+                    width: poopWidth,
+                    height: desiredHeight,
+                    speed: 3 * scaleFactor + Math.random() * 2 * scaleFactor, // Random speed
+                });
+            }
+        };
+
+        // Sounds
+        const collisionSound = new Audio("パッ.mp3"); // Replace with the actual path
+        const bgm = new Audio("Wind up Toys.mp3"); // Replace with the actual path
+        bgm.loop = true;
+
+        // Draw player
+        function drawPlayer() {
+            ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+        }
+
+        // Draw all poops
+        function drawPoops() {
+            poops.forEach((poop) => {
+                ctx.drawImage(poopImage, poop.x, poop.y, poop.width, poop.height);
+            });
+        }
+
+        // Update player position
+        function updatePlayer() {
+            player.x += player.dx;
+
+            // Prevent player from moving out of bounds
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        }
+
+        // Update positions of poops
+        function updatePoops() {
+            poops.forEach((poop) => {
+                poop.y += poop.speed;
+
+                // Reset poop when it goes off-screen
+                if (poop.y > canvas.height) {
+                    poop.y = Math.random() * -canvas.height; // Restart above screen
+                    poop.x = Math.random() * (canvas.width - poop.width);
+                    score++;
+                    poop.speed += 0.1 * scaleFactor; // Gradually increase speed
+                }
+            });
+        }
+
+        // Check collision with all poops
+        function checkCollision() {
+            poops.forEach((poop) => {
+                if (
+                    player.x < poop.x + poop.width &&
+                    player.x + player.width > poop.x &&
+                    player.y < poop.y + poop.height &&
+                    player.y + player.height > poop.y
+                ) {
+                    collisionSound.play();
+                    showRetryScreen();
+                    running = false;
+                }
+            });
+        }
+
+        // Clear canvas
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (!running) return;
+
+            clearCanvas();
+            drawPlayer();
+            drawPoops();
+            drawScore();
+            updatePlayer();
+            updatePoops();
+            checkCollision();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Draw score
+        function drawScore() {
+            ctx.font = `${20 * scaleFactor}px Arial`;
+            ctx.fillStyle = BLACK;
+            ctx.fillText(`Score: ${score}`, 10, 30 * scaleFactor);
+        }
+
+        // Start game
+        function startGame() {
+            running = true;
+            score = 0;
+            poops.forEach((poop) => {
+                poop.y = Math.random() * -canvas.height; // Reset positions
+                poop.speed = 3 * scaleFactor + Math.random() * 2 * scaleFactor; // Reset speed
+            });
+            bgm.play();
+            gameLoop();
+        }
+
+        // Show start screen
+        const startScreen = document.getElementById('startScreen');
+        document.getElementById('startButton').addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            startGame();
+        });
+
+        // Show retry screen
+        const retryScreen = document.getElementById('retryScreen');
+        function showRetryScreen() {
+            retryScreen.style.display = 'flex';
+            bgm.pause();
+        }
+
+        document.getElementById('retryButton').addEventListener('click', () => {
+            retryScreen.style.display = 'none';
+            startGame();
+        });
+
+        // Key controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') player.dx = -player.speed;
+            if (e.key === 'ArrowRight') player.dx = player.speed;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') player.dx = 0;
+        });
+    </script>
+</body>
+</html>
